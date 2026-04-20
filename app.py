@@ -4,7 +4,7 @@ import datetime
 import os
 import re
 
-# -------------------------- 企业版：本地文件永久存储（永不丢失） --------------------------
+# -------------------------- 企业版：本地文件永久存储 --------------------------
 DATA_FOLDER = "data"
 if not os.path.exists(DATA_FOLDER):
     os.makedirs(DATA_FOLDER)
@@ -28,6 +28,7 @@ def load_df(file):
         return pd.read_excel(file)
     except:
         return pd.DataFrame()
+
 def save_df(file, df):
     df.to_excel(file, index=False)
 
@@ -79,8 +80,20 @@ st.set_page_config(page_title="深信服托管云渠道机器人", page_icon="�
 st.markdown("""
 <style>
 .main { background: #f5f7fa; }
-.card { background: white; padding: 24px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.07); margin-bottom:20px; }
-.stButton>button { background:#004682; color:white; border-radius:8px; }
+.card { background: white; padding: 24px; border-radius: 14px; box-shadow: 0 2px 14px rgba(0,0,0,0.06); margin-bottom:20px; }
+.stat-card {
+    background: white;
+    padding: 20px;
+    border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    text-align: center;
+}
+.stButton>button { 
+    background:#004682; 
+    color:white; 
+    border-radius:8px;
+    font-size:15px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -189,10 +202,45 @@ with tab4:
 
         if pwd_input == correct_pwd:
             st.success("✅ 管理员已登录")
+
+            # ==============================================
+            # 📊 【新增】数据统计面板
+            # ==============================================
+            st.subheader("📊 数据统计中心")
+            df_apply = load_df(APPLY_FILE)
+            df_qualify = load_df(QUALIFY_FILE)
+
+            total_apply = len(df_apply)
+            waiting = len(df_apply[df_apply["status"] == "待审核"]) if "status" in df_apply.columns else 0
+            total_account = len(df_qualify)
+            
+            scta = len(df_qualify[df_qualify["level"] == "SCTA"])
+            sctp = len(df_qualify[df_qualify["level"] == "SCTP"])
+            scte = len(df_qualify[df_qualify["level"] == "SCTE"])
+
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.markdown(f"<div class='stat-card'><h3>{total_apply}</h3><p>总报名人数</p></div>", unsafe_allow_html=True)
+            with col2:
+                st.markdown(f"<div class='stat-card'><h3>{waiting}</h3><p>待审核人数</p></div>", unsafe_allow_html=True)
+            with col3:
+                st.markdown(f"<div class='stat-card'><h3>{total_account}</h3><p>已开通账号</p></div>", unsafe_allow_html=True)
+
+            colA, colB, colC = st.columns(3)
+            with colA:
+                st.markdown(f"<div class='stat-card'><h3>{scta}</h3><p>初级 SCTA</p></div>", unsafe_allow_html=True)
+            with colB:
+                st.markdown(f"<div class='stat-card'><h3>{sctp}</h3><p>中级 SCTP</p></div>", unsafe_allow_html=True)
+            with colC:
+                st.markdown(f"<div class='stat-card'><h3>{scte}</h3><p>高级 SCTE</p></div>", unsafe_allow_html=True)
+
+            st.markdown("---")
+
+            # 子菜单
             tab_a, tab_b, tab_c, tab_d = st.tabs([
                 "1⃣ 开通账号",
                 "2⃣ 批量导入",
-                "3⃣ 报名列表",
+                "3⃣ 数据列表",
                 "4⃣ 系统设置"
             ])
 
@@ -221,14 +269,12 @@ with tab4:
 
             with tab_c:
                 st.subheader("用户报名列表（可导出）")
-                df_apply = load_df(APPLY_FILE)
                 st.dataframe(df_apply, use_container_width=True)
                 st.download_button("导出报名数据", df_apply.to_excel(index=False), file_name="报名列表.xlsx")
 
                 st.subheader("已开通资格列表")
-                df_q = load_df(QUALIFY_FILE)
-                st.dataframe(df_q, use_container_width=True)
-                st.download_button("导出资格数据", df_q.to_excel(index=False), file_name="资格列表.xlsx")
+                st.dataframe(df_qualify, use_container_width=True)
+                st.download_button("导出资格数据", df_qualify.to_excel(index=False), file_name="资格列表.xlsx")
 
             with tab_d:
                 st.subheader("修改管理员密码")
