@@ -1,239 +1,169 @@
 import streamlit as st
 import pandas as pd
-import os
 import datetime
 
-# -------------------------- 配置区 --------------------------
-DATA_FILE = "data.xlsx"
-APPLY_FILE = "apply_data.xlsx"
+# -------------------------- 云端数据存储（Streamlit 官方） --------------------------
+def init_cloud_data():
+    if "qualify_data" not in st.session_state:
+        st.session_state.qualify_data = pd.DataFrame(columns=["code", "level", "level_name", "create_time"])
+    if "apply_data" not in st.session_state:
+        st.session_state.apply_data = pd.DataFrame(columns=["name","phone","company","email","id_last4","apply_time","status","code"])
+
+init_cloud_data()
 ADMIN_PASSWORD = "123456"
 
-st.set_page_config(
-    page_title="深信服托管云渠道机器人",
-    page_icon="🤖",
-    layout="wide"
-)
-
-# 页面样式美化（商务深蓝色风格）
+# -------------------------- 页面样式 --------------------------
+st.set_page_config(page_title="深信服托管云渠道机器人", page_icon="🤖", layout="wide")
 st.markdown("""
 <style>
-    .main { background-color: #f8f9fa; }
-    .stTextInput, .stSelectbox { border-radius: 8px; }
-    .stButton>button {
-        border-radius: 8px;
-        background-color: #004682;
-        color: white;
-        font-size:16px;
-    }
-    .stButton>button:hover {
-        background-color: #003366;
-        color:white;
-    }
-    .card {
-        background-color:white;
-        padding:20px;
-        border-radius:12px;
-        box-shadow:0 2px 8px rgba(0,0,0,0.08);
-        margin-bottom:16px;
-    }
-    h1 { color: #004682; }
-    h3 { color: #004682; }
+    .main { background: #f5f7fa; }
+    .card { background: white; padding: 24px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-bottom:20px; }
+    .stButton>button { background:#004682; color:white; border-radius:8px; }
 </style>
 """, unsafe_allow_html=True)
 
-# 初始化文件
-def init_files():
-    if not os.path.exists(DATA_FILE):
-        df = pd.DataFrame(columns=["code", "level", "level_name", "create_time"])
-        df.to_excel(DATA_FILE, index=False)
-    if not os.path.exists(APPLY_FILE):
-        df = pd.DataFrame(columns=["name","phone","company","email","apply_level","apply_time","status","code"])
-        df.to_excel(APPLY_FILE, index=False)
-
-def load_qualify_data():
-    try:
-        df = pd.read_excel(DATA_FILE)
-        return df.to_dict("records")
-    except:
-        return []
-
-def load_apply_data():
-    try:
-        df = pd.read_excel(APPLY_FILE)
-        return df.to_dict("records")
-    except:
-        return []
-
-def add_qualify_data(new_code, new_level, new_level_name):
-    df = pd.read_excel(DATA_FILE)
-    if new_code in df["code"].astype(str).values:
+# -------------------------- 功能函数 --------------------------
+def add_qualify_data(code, level, level_name):
+    df = st.session_state.qualify_data
+    if code in df["code"].astype(str).values:
         return False
     new_row = {
-        "code": new_code,
-        "level": new_level,
-        "level_name": new_level_name,
+        "code": code,
+        "level": level,
+        "level_name": level_name,
         "create_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
-    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-    df.to_excel(DATA_FILE, index=False)
+    df.loc[len(df)] = new_row
+    st.session_state.qualify_data = df
     return True
 
-def save_apply_info(name, phone, company, email, apply_level):
-    df = pd.read_excel(APPLY_FILE)
+def save_apply(name, phone, company, email, id_last4):
+    df = st.session_state.apply_data
     new_row = {
-        "name": name, "phone": phone, "company": company, "email": email,
-        "apply_level": apply_level, "apply_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "status": "待审核", "code": ""
+        "name": name,
+        "phone": phone,
+        "company": company,
+        "email": email,
+        "id_last4": id_last4,
+        "apply_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "status": "待审核",
+        "code": ""
     }
-    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-    df.to_excel(APPLY_FILE, index=False)
-    return True
+    df.loc[len(df)] = new_row
+    st.session_state.apply_data = df
 
-init_files()
-QUALIFIED_LIST = load_qualify_data()
-
-# -------------------------- 页面标题 --------------------------
+# -------------------------- 页面 --------------------------
 st.title("🤖 深信服托管云渠道机器人")
-st.markdown("#### 渠道资格查询 | 认证流程 | 报名开通 | 数据管理")
-st.markdown("---")
+tab1, tab2, tab3, tab4 = st.tabs(["🔍 资格查询","📖 认证流程","📝 报名开通","⚙️ 管理后台"])
 
-# 选项卡
-tab1, tab2, tab3, tab4 = st.tabs([
-    "🔍 资格查询",
-    "📖 认证流程",
-    "📝 报名开通",
-    "⚙️ 管理后台"
-])
-
-# ==============================================
-# 选项卡1：资格查询
-# ==============================================
 with tab1:
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.subheader("🏅 渠道资格等级查询")
-    user_code = st.text_input("渠道公式名称", placeholder="例如：SXF2025001")
-    if st.button("立即查询", type="primary"):
-        if not user_code:
-            st.error("请输入渠道公式名称")
-        else:
-            find = None
-            for item in QUALIFIED_LIST:
-                if str(item["code"]).strip() == user_code.strip():
-                    find = item
-                    break
-            if find:
-                lv = find["level"]
-                lv_name = find["level_name"]
-                st.success(f"✅ 查询成功：{user_code}")
-                st.markdown(f"**等级：** {lv_name}")
-                st.markdown(f"**编码：** {lv}")
-                if lv == "SCTA":
-                    st.info("📌 初级渠道认证 SCTA")
-                elif lv == "SCTP":
-                    st.warning("📌 中级渠道认证 SCTP")
-                elif lv == "SCTE":
-                    st.error("📌 高级渠道认证 SCTE")
+    with st.container():
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("🏅 渠道资格查询")
+        code = st.text_input("渠道公式名称")
+        if st.button("立即查询"):
+            df = st.session_state.qualify_data
+            res = df[df["code"].astype(str).str.strip() == str(code).strip()]
+            if len(res) > 0:
+                r = res.iloc[0]
+                st.success(f"✅ 有效账号：{code}")
+                st.info(f"等级：{r['level_name']} ({r['level']})")
                 st.balloons()
             else:
-                st.error("❌ 未查询到该账号信息")
-    st.markdown("</div>", unsafe_allow_html=True)
+                st.error("❌ 未查询到信息")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-# ==============================================
-# 选项卡2：认证流程
-# ==============================================
 with tab2:
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.subheader("📖 渠道认证流程说明")
-    st.markdown("""
-    **🏅 认证等级**
-    • 初级 SCTA：基础渠道认证
-    • 中级 SCTP：进阶渠道认证
-    • 高级 SCTE：高级别渠道认证
+    with st.container():
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("📖 托管云认证流程说明")
+        st.markdown("""
+您好，有需要托管云认证的同事可以通过在线链接或微信扫码形式进行托管云认证课程报名，报名后同步下我及时给大家开通学习账号
 
-    **📌 认证流程**
-    1. 填写报名信息（姓名、公司、电话）
-    2. 提交申请，等待管理员审核
-    3. 审核通过后自动开通认证账号
-    4. 凭渠道公式名称可查询资格等级
+**在线链接**：https://www.wjx.cn/vm/wBFmQyO.aspx#
+**微信扫码**：（请使用微信扫描上方二维码报名）
 
-    **💡 说明**
-    • 唯一渠道公式名称开通后生效
-    • 可随时查询认证状态
-    • 数据永久保存，安全可靠
-    """)
-    st.success("✅ 提交报名后，1-3个工作日内完成审核开通")
-    st.markdown("</div>", unsafe_allow_html=True)
+或者有需要认证的同事,直接将公司名称全称、姓名、电话、邮箱、身份证后4位请提供下
+单位名称：
+姓名：
+手机号码：
+邮箱：
+身份证后四位:
+请报完名后通知下我 这边开通学习考试账号
 
-# ==============================================
-# 选项卡3：报名开通
-# ==============================================
+---
+## 托管云认证流程（免费认证）
+线上报名->在线课程学习->线上实验练习->知识自检->认证考核->颁发证书
+
+## 认证形式：
+PT1（SCTA）初级笔试+初级实验
+PT2（SCTP）中级笔记+中级实验
+PT3（SCTE）高级笔试+线上面试
+
+---
+## ⚠️ 请仔细阅读下面注意事项！！！！！！！！！
+认证必须从初级到高级，不能直接考高级的,之前认证过期了需要重考,重考和新考的流程是一样的
+
+当前所有认证都是线上形式，课程没有设置截止时间，课程中的视频和实验不要求全部完成，里面的内容都是分版块的，大家可以根据需要自行查漏补缺选择学习
+
+课程上面的实验当前暂时无法在线模拟使用，但可以点开查看学习左边的实验手册，如果想要实战练习，可以联系渠道经理李换杰获取练习环境
+
+课程最后会有笔试，课程最后的笔试若未通过，需要联系渠道经理重置考试成绩，才能再次进行考试，笔试通过后，初中级实验和高级面试需要单独找渠道经理李换杰预约下哈，预约请提供笔试通过的截图，说明要认证的级别并提供邮箱和考试时间（至少要提前一天预约）后会发送考试通知
+
+托管云相关考试都是70分通过，初中各三次补考机会，高级一次机会，若连续未过，需要等三个月后才能重新认证
+
+初中级笔试都是3小时，涉及到等保组件+平台基础操作+RDS+监控告警配置
+
+初级实验是2小时，中级实验是3小时，收到考试通知后，1天内未完成考试视为考试未通过，环境会被重置，需要重新预约考试
+
+高级面试线上进行，预计15分钟，涉及到计算机基础知识+平台基础操作
+""")
+        st.markdown("</div>", unsafe_allow_html=True)
+
 with tab3:
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.subheader("📝 智能报名 - 自动开通认证账号")
-    with st.form("apply_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            name = st.text_input("姓名 *")
-            phone = st.text_input("联系电话 *")
-            company = st.text_input("公司名称 *")
-        with col2:
-            email = st.text_input("邮箱")
-            apply_level = st.selectbox("申请认证等级", ["初级 SCTA", "中级 SCTP", "高级 SCTE"])
-        submit = st.form_submit_button("✅ 提交报名信息")
-        
-        if submit:
-            if not name or not phone or not company:
-                st.error("请填写完整必填信息")
-            else:
-                save_apply_info(name, phone, company, email, apply_level)
-                st.success("✅ 报名提交成功！管理员将尽快审核开通")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# ==============================================
-# 选项卡4：管理后台
-# ==============================================
-with tab4:
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.subheader("⚙️ 管理员后台")
-    pwd = st.text_input("管理员密码", type="password")
-    if pwd == ADMIN_PASSWORD:
-        st.success("✅ 已登录管理员模式")
-
-        st.markdown("#### 1. 开通认证账号")
-        with st.form("add_form"):
-            code = st.text_input("渠道公式名称")
-            level = st.selectbox("等级", ["SCTA", "SCTP", "SCTE"])
-            level_map = {"SCTA":"初级","SCTP":"中级","SCTE":"高级"}
-            lv_name = level_map[level]
-            add_btn = st.form_submit_button("添加并开通账号")
-            if add_btn:
-                if not code:
-                    st.error("请输入渠道公式名称")
+    with st.container():
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("📝 托管云认证报名")
+        with st.form("apply"):
+            c1,c2 = st.columns(2)
+            with c1:
+                company = st.text_input("单位名称（全称） *")
+                name = st.text_input("姓名 *")
+                phone = st.text_input("手机号码 *")
+            with c2:
+                email = st.text_input("邮箱 *")
+                id_last4 = st.text_input("身份证后四位 *")
+            if st.form_submit_button("提交报名信息"):
+                if name and phone and company and email and id_last4:
+                    save_apply(name, phone, company, email, id_last4)
+                    st.success("✅ 报名信息提交成功！\n\n已收到您的资料，管理员将尽快为您开通学习考试账号！")
                 else:
-                    r = add_qualify_data(code, level, lv_name)
-                    if r:
-                        st.success(f"✅ {code} 开通成功")
-                        st.rerun()
-                    else:
-                        st.error("❌ 已存在")
+                    st.error("⚠️ 请填写完整所有必填信息！")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("---")
-        st.markdown("#### 2. 报名信息列表")
-        apply_data = load_apply_data()
-        if apply_data:
-            st.dataframe(pd.DataFrame(apply_data), use_container_width=True)
-        else:
-            st.info("暂无报名")
-
-        st.markdown("---")
-        st.markdown("#### 3. 已开通账号列表")
-        if QUALIFIED_LIST:
-            st.dataframe(pd.DataFrame(QUALIFIED_LIST), use_container_width=True)
-        else:
-            st.info("暂无开通账号")
-    elif pwd != "":
-        st.error("密码错误")
-    st.markdown("</div>", unsafe_allow_html=True)
+with tab4:
+    with st.container():
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        pwd = st.text_input("管理员密码", type="password")
+        if pwd == ADMIN_PASSWORD:
+            st.success("✅ 管理员已登录")
+            st.subheader("1. 开通认证账号")
+            with st.form("add"):
+                code = st.text_input("渠道公式名称")
+                level = st.selectbox("等级", ["SCTA","SCTP","SCTE"])
+                name_map = {"SCTA":"初级","SCTP":"中级","SCTE":"高级"}
+                if st.form_submit_button("添加并开通"):
+                    if code:
+                        res = add_qualify_data(code, level, name_map[level])
+                        if res:
+                            st.success(f"✅ {code} 开通成功")
+                        else:
+                            st.error("❌ 已存在")
+            st.subheader("2. 报名列表")
+            st.dataframe(st.session_state.apply_data, use_container_width=True)
+            st.subheader("3. 已开通账号")
+            st.dataframe(st.session_state.qualify_data, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("---")
 st.caption("📌 深信服托管云渠道专用系统 | 内部使用")
